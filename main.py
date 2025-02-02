@@ -125,28 +125,6 @@ def download_media_file(url, media_type, selected_format):
             'outtmpl': os.path.join(tmpdirname, '%(title)s.%(ext)s'),
             'noplaylist': True,
             'progress_hooks': [create_progress_hook(progress_text, progress_bar)],
-            'compat_opts': {
-                'no-youtube-unavailable-videos': True,
-                'legacy-html': True
-            },
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-us,en;q=0.5',
-                'Sec-Fetch-Mode': 'navigate',
-            },
-            'nocheckcertificate': True,
-            'ignoreerrors': False,
-            'retries': 3,
-            'fragment_retries': 3,
-            'skip_unavailable_fragments': True,
-            'no_part': True,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android'],
-                    'player_skip': ['configs'],
-                }
-            }
         }
 
         if media_type == 'audio':
