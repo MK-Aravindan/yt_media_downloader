@@ -5,8 +5,8 @@ import tempfile
 import time
 
 st.set_page_config(
-    page_title="Media Downloader",
-    page_icon="https://www.media.com/favicon.ico",
+    page_title="YT Media Downloader",
+    page_icon="https://www.youtube.com/favicon.ico",
     layout="centered",
     initial_sidebar_state="auto"
 )
@@ -175,10 +175,10 @@ def download_media_file(url, media_type, selected_format):
             return None, f"Error during download: {e}", False
 
 def main():
-    st.title("Media Downloader")
-    st.markdown("Effortlessly download high-quality videos and audio from YouTube, Instagram, LinkedIn, X!")
+    st.title("YouTube Media Downloader")
+    st.markdown("Download your favorite YouTube videos or audio in high quality.")
 
-    video_url = st.text_input("Enter the URL:")
+    video_url = st.text_input("Enter the YouTube video URL:")
     media_type = st.radio("Select media type to download:", ('audio', 'video'))
 
     if video_url:
