@@ -5,8 +5,8 @@ import tempfile
 import time
 
 st.set_page_config(
-    page_title="YT Media Downloader",
-    page_icon="https://www.youtube.com/favicon.ico",
+    page_title="Media Downloader",
+    page_icon="https://www.media.com/favicon.ico",
     layout="centered",
     initial_sidebar_state="auto"
 )
@@ -121,30 +121,25 @@ def download_media_file(url, media_type, selected_format):
     progress_bar = st.progress(0)
     
     with tempfile.TemporaryDirectory() as tmpdirname:
-        ydl_opts_base = {
-            'outtmpl': os.path.join(tmpdirname, '%(title)s.%(ext)s'),
+        outtmpl = os.path.join(tmpdirname, '%(title)s.%(ext)s')
+        ydl_opts = {
+            'outtmpl': outtmpl,
             'noplaylist': True,
             'progress_hooks': [create_progress_hook(progress_text, progress_bar)],
         }
-
+        
         if media_type == 'audio':
-            ydl_opts = {
-                **ydl_opts_base,
-                'format': selected_format,
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                }],
-            }
+            ydl_opts['format'] = selected_format
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+            }]
         elif media_type == 'video':
-            ydl_opts = {
-                **ydl_opts_base,
-                'format': f'bestvideo[height={selected_format}]+bestaudio/best',
-                'merge_output_format': 'mp4',
-            }
+            ydl_opts['format'] = f'bestvideo[height={selected_format}]+bestaudio/best'
+            ydl_opts['merge_output_format'] = 'mp4'
         else:
             return None, "Unsupported media type.", False
-
+        
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
@@ -158,10 +153,7 @@ def download_media_file(url, media_type, selected_format):
 
             if media_type == 'video':
                 mp4_files = [f for f in downloaded_files if f.lower().endswith('.mp4')]
-                if mp4_files:
-                    file_name = mp4_files[0]
-                else:
-                    file_name = downloaded_files[0]
+                file_name = mp4_files[0] if mp4_files else downloaded_files[0]
             else:
                 file_name = downloaded_files[0]
 
@@ -175,10 +167,10 @@ def download_media_file(url, media_type, selected_format):
             return None, f"Error during download: {e}", False
 
 def main():
-    st.title("YouTube Media Downloader")
-    st.markdown("Download your favorite YouTube videos or audio in high quality.")
+    st.title("Media Downloader")
+    st.markdown("Effortlessly download high-quality videos and audio from YouTube, Instagram, LinkedIn, X!")
 
-    video_url = st.text_input("Enter the YouTube video URL:")
+    video_url = st.text_input("Enter the URL:")
     media_type = st.radio("Select media type to download:", ('audio', 'video'))
 
     if video_url:
@@ -224,7 +216,7 @@ def main():
                     mime="application/octet-stream"
                 )
             else:
-                st.error(result)            
+                st.error(result)
 
 if __name__ == "__main__":
     main()
