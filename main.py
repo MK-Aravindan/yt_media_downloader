@@ -3,6 +3,7 @@ import yt_dlp
 import os
 import tempfile
 import time
+from datetime import datetime
 
 st.set_page_config(
     page_title="YT Media Downloader",
@@ -13,10 +14,17 @@ st.set_page_config(
 
 st.markdown("""
     <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     .main {
         background-color: #F5F5F5;
         padding: 2rem;
         border-radius: 10px;
+    }
+    .block-container {
+        margin: 0 0 10px 0;
+        padding: 0 0 5rem 0;
     }
     h1 {
         color: #4F4F4F;
@@ -43,15 +51,32 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+YDL_DEFAULTS = {
+    'nocheckcertificate': True,
+    'ignoreerrors': True,
+    'quiet': True,
+    'no_warnings': True,
+    'user_agent': 'Mozilla/5.0',
+    'skip_download': True,
+}
+
+def format_upload_date(raw_date):
+    if not raw_date or len(raw_date) != 8:
+        return raw_date
+    try:
+        return datetime.strptime(raw_date, "%Y%m%d").strftime("%b %d, %Y")
+    except Exception:
+        return raw_date
+
 @st.cache_data(show_spinner=False)
 def fetch_video_info(url):
     try:
-        with yt_dlp.YoutubeDL() as ydl:
+        with yt_dlp.YoutubeDL(YDL_DEFAULTS) as ydl:
             info_dict = ydl.extract_info(url, download=False)
             video_info = {
                 'title': info_dict.get('title'),
                 'uploader': info_dict.get('uploader'),
-                'upload_date': info_dict.get('upload_date'),
+                'upload_date': format_upload_date(info_dict.get('upload_date')),
                 'thumbnail': info_dict.get('thumbnail')
             }
             return video_info, True
@@ -61,59 +86,64 @@ def fetch_video_info(url):
 @st.cache_data(show_spinner=False)
 def fetch_audio_formats(url):
     try:
-        with yt_dlp.YoutubeDL() as ydl:
+        with yt_dlp.YoutubeDL(YDL_DEFAULTS) as ydl:
             info_dict = ydl.extract_info(url, download=False)
             formats = info_dict.get('formats', [])
-
             audio_formats = []
             for f in formats:
                 if f.get('acodec') != 'none' and f.get('vcodec') == 'none':
                     format_id = f.get('format_id')
                     ext = f.get('ext')
-                    bitrate = f.get('abr', 0)
+                    bitrate = f.get('abr')
+                    bitrate_str = f"{bitrate} kbps" if bitrate else "Unknown"
                     audio_formats.append({
                         'format_id': format_id,
                         'extension': ext,
-                        'bitrate': bitrate,
+                        'bitrate': bitrate_str,
                         'resolution': 'Audio Only'
                     })
-
-            audio_formats.sort(key=lambda x: x['bitrate'], reverse=True)
+            audio_formats.sort(key=lambda x: int(x['bitrate'].split()[0]) if x['bitrate'] != "Unknown" else 0, reverse=True)
             return audio_formats, True
     except Exception as e:
-        return f"Error fetching audio formats: {e}", []
+        return f"Error fetching audio formats: {e}", False
 
 @st.cache_data(show_spinner=False)
 def fetch_resolutions(url):
     try:
-        with yt_dlp.YoutubeDL() as ydl:
+        with yt_dlp.YoutubeDL(YDL_DEFAULTS) as ydl:
             info_dict = ydl.extract_info(url, download=False)
             formats = info_dict.get('formats', [])
             resolutions = sorted({f.get("height") for f in formats if f.get("height")}, reverse=True)
             return resolutions, True
     except Exception as e:
-        return f"Error fetching resolutions: {e}", []
+        return f"Error fetching resolutions: {e}", False
 
 def create_progress_hook(progress_text, progress_bar):
     def progress_hook(d):
         if d.get('status') == 'downloading':
             total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
             downloaded_bytes = d.get('downloaded_bytes', 0)
+
             if total_bytes:
-                percent = downloaded_bytes / total_bytes * 100
+                percent = downloaded_bytes / total_bytes
+
+                progress_bar.progress(percent)
+
+                total_size_str = f"{total_bytes/1024/1024:.2f} MiB"
+                speed = d.get('speed')
+                speed_str = f"{speed/1024/1024:.2f} MiB/s" if speed else "N/A"
+                eta = d.get('eta')
+                eta_str = time.strftime("%H:%M:%S", time.gmtime(eta)) if eta is not None else "N/A"
+                
+                progress_text.text(f"Downloading: {percent:.1%} of {total_size_str} at {speed_str} (ETA: {eta_str})")
+
             else:
-                percent = 0
+                progress_text.text(f"Downloading: {d.get('downloaded_bytes')/1024/1024:.2f} MiB (Total size unknown)")
 
-            speed = d.get('speed')
-            speed_str = f"{speed/1024/1024:.2f}MiB/s" if speed else "N/A"
-            eta = d.get('eta')
-            eta_str = time.strftime("%H:%M:%S", time.gmtime(eta)) if eta else "N/A"
-            total_size_str = f"{total_bytes/1024/1024:.2f}MiB" if total_bytes else "N/A"
-
-            progress_bar.progress(min(int(percent), 100))
-            progress_text.text(f"{percent:.1f}% of {total_size_str} at {speed_str} ETA {eta_str}")
         elif d.get('status') == 'finished':
+            progress_bar.progress(1.0)
             progress_text.text("Download complete, now post-processing...")
+            
     return progress_hook
 
 def download_media_file(url, media_type, selected_format):
@@ -122,15 +152,18 @@ def download_media_file(url, media_type, selected_format):
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         ydl_opts_base = {
-            'outtmpl': os.path.join(tmpdirname, '%(title)s.%(ext)s'),
+            'outtmpl': os.path.join(tmpdirname, '%(id)s.%(ext)s'),
             'noplaylist': True,
             'progress_hooks': [create_progress_hook(progress_text, progress_bar)],
+            'quiet': True,
+            'no_warnings': True,
+            'nocheckcertificate': True,
         }
 
         if media_type == 'audio':
             ydl_opts = {
                 **ydl_opts_base,
-                'format': selected_format,
+                'format': selected_format if selected_format else 'bestaudio/best',
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -139,7 +172,7 @@ def download_media_file(url, media_type, selected_format):
         elif media_type == 'video':
             ydl_opts = {
                 **ydl_opts_base,
-                'format': f'bestvideo[height={selected_format}]+bestaudio/best',
+                'format': f'bestvideo[height<={selected_format}]+bestaudio/best/best[height<={selected_format}]',
                 'merge_output_format': 'mp4',
             }
         else:
@@ -156,15 +189,7 @@ def download_media_file(url, media_type, selected_format):
             if not downloaded_files:
                 return None, "The downloaded file is empty or not found after download.", False
 
-            if media_type == 'video':
-                mp4_files = [f for f in downloaded_files if f.lower().endswith('.mp4')]
-                if mp4_files:
-                    file_name = mp4_files[0]
-                else:
-                    file_name = downloaded_files[0]
-            else:
-                file_name = downloaded_files[0]
-
+            file_name = downloaded_files[0]
             file_path = os.path.join(tmpdirname, file_name)
             with open(file_path, 'rb') as f:
                 file_bytes = f.read()
@@ -175,10 +200,10 @@ def download_media_file(url, media_type, selected_format):
             return None, f"Error during download: {e}", False
 
 def main():
-    st.title("YouTube Media Downloader")
-    st.markdown("Download your favorite YouTube videos or audio in high quality.")
+    st.title("Media Downloader")
+    st.markdown("Download your favorite YouTube, Instagram, X (Twitter), LinkedIn videos or audio in high quality.")
 
-    video_url = st.text_input("Enter the YouTube video URL:")
+    video_url = st.text_input("Enter the video URL (YouTube, Instagram, X, LinkedIn etc.):")
     media_type = st.radio("Select media type to download:", ('audio', 'video'))
 
     selected_format = None
@@ -198,11 +223,12 @@ def main():
             else:
                 st.error(video_info)
 
+        # AUDIO SELECTION
         if media_type == 'audio':
             audio_formats, aud_checker = fetch_audio_formats(video_url)
             if aud_checker and audio_formats:
                 format_options = [
-                    f"{fmt['bitrate']} kbps ({fmt['extension'].upper()})"
+                    f"{fmt['bitrate']} ({fmt['extension'].upper()})"
                     for fmt in audio_formats
                 ]
                 if format_options:
@@ -215,6 +241,7 @@ def main():
                 st.info("Couldn't fetch audio formats, defaulting to best audio quality.")
                 selected_format = 'bestaudio/best'
 
+        # VIDEO SELECTION
         elif media_type == 'video':
             with st.spinner("Fetching available resolutions..."):
                 resolutions, res_checker = fetch_resolutions(video_url)
