@@ -58,6 +58,9 @@ YDL_DEFAULTS = {
     'no_warnings': True,
     'user_agent': 'Mozilla/5.0',
     'skip_download': True,
+    'geo_bypass': True,
+    'no_mtime': True,
+    'socket_timeout': 10
 }
 
 def format_upload_date(raw_date):
