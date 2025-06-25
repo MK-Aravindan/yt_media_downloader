@@ -1,0 +1,19 @@
+# .github/workflows/deploy.yml content (as provided in the previous response)
+name: Deploy Streamlit App to Render
+
+on:
+  push:
+    branches:
+      - main # Trigger this workflow on pushes to the 'main' branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Dummy step to indicate Render auto-deploy
+      run: echo "GitHub Actions is configured. Render will auto-deploy from this repository."
+      # No explicit deployment step here if you rely on Render's native Git integration.
+      # The presence of this workflow will be enough for GitHub to show the "Actions" tab.
